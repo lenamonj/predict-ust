@@ -85,33 +85,72 @@ Walk-forward, out of sample, 2005 to date. P&L is a duration overlay on the call
 
 ## Setup
 
-Requires Python 3.13 and a free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html).
+Windows, PowerShell. Every command below runs Python from the project's own virtual environment by its full path, so nothing needs to be activated and script execution policy does not matter.
+
+**1. Prerequisites**
+
+- Python 3.13 from [python.org](https://www.python.org/downloads/). The installer also installs the `py` launcher. Confirm with `py -3.13 --version`.
+- A free [FRED API key](https://fred.stlouisfed.org/docs/api/api_key.html).
+- VS Code with the **Python** and **Jupyter** extensions, to view the notebook.
+
+**2. Download the code**
+
+On the GitHub page click **Code**, then **Download ZIP**. Extract it to a folder of your choice, for example `C:\Users\<you>\projects\`. The extracted folder is `predict-ust-main`.
+
+**3. Open PowerShell in the project folder**
+
+```powershell
+cd C:\Users\<you>\projects\predict-ust-main
+```
+
+**4. Create the virtual environment and install**
 
 ```powershell
 py -3.13 -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pip install -e .
-python -m ipykernel install --user --name ust_rv
+.venv\Scripts\python.exe -m pip install --upgrade pip
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m pip install -e .
+.venv\Scripts\python.exe -m ipykernel install --user --name ust_rv --display-name ust_rv
 ```
 
-Create `.env` in the repo root:
+**5. Add your FRED key**
 
-```
-FRED_API_KEY=your_key_here
+Replace `your_key_here` with your key. Use this command rather than Notepad, which saves the file as `.env.txt`.
+
+```powershell
+Set-Content -Path .env -Value "FRED_API_KEY=your_key_here" -Encoding ascii
 ```
 
-The first run downloads and caches all series under `cache/`. Later runs fetch only what is new.
+**6. Check the install**
+
+```powershell
+.venv\Scripts\python.exe -m pytest -m "not network" -q
+```
+
+Expect `151 passed`.
+
+**7. First run**
+
+```powershell
+.venv\Scripts\python.exe -m nbconvert --to html --execute --ExecutePreprocessor.kernel_name=ust_rv --ExecutePreprocessor.timeout=3600 notebook\UST_RV_Score.ipynb
+```
+
+This downloads every series into `cache\` and writes `notebook\UST_RV_Score.html`, which opens in any browser. The first run takes about 2 minutes on a normal connection. Later runs fetch only what is new and take about 75 seconds.
+
+**Troubleshooting**
+
+| Symptom | Fix |
+|---|---|
+| `py` is not recognized | Python is not installed, or was installed without the launcher. Reinstall from python.org with the default options. |
+| `SSL: CERTIFICATE_VERIFY_FAILED` from pip or during the first run | A corporate proxy is intercepting HTTPS. Ask IT for the proxy settings or certificate bundle for Python. |
+| `FRED_API_KEY not set` | `.env` is missing from the project folder or is named `.env.txt`. Repeat step 5. |
+| Kernel `ust_rv` not listed in VS Code | Use **File > Open Folder** on the project folder, then reload the window. |
 
 ## Usage
 
-**Notebook.** Open [`notebook/UST_RV_Score.ipynb`](notebook/UST_RV_Score.ipynb) with the `ust_rv` kernel and Run All (about 75 seconds with a warm cache). It opens with today's calls, then the factor and theme drivers, the yield history with calls shaded, the performance scorecard and the robustness checks.
+**Notebook.** In VS Code, **File > Open Folder** on the project folder, open [`notebook/UST_RV_Score.ipynb`](notebook/UST_RV_Score.ipynb), choose **Select Kernel** and pick `ust_rv`, then **Run All**. It opens with today's calls, then the factor and theme drivers, the yield history with calls shaded, the performance scorecard and the robustness checks.
 
-**Headless HTML report.**
-
-```powershell
-jupyter nbconvert --to html --execute --ExecutePreprocessor.kernel_name=ust_rv notebook\UST_RV_Score.ipynb
-```
+**HTML report.** Step 7 above, any time.
 
 **From Python.**
 
@@ -125,14 +164,14 @@ print(result.signal)
 **Threshold calibration.**
 
 ```powershell
-python -m ust_rv.backtest.calibrate
+.venv\Scripts\python.exe -m ust_rv.backtest.calibrate
 ```
 
 ## Tests
 
 ```powershell
-pytest -m "not network"   # offline suite, 151 tests
-pytest                    # full suite including live data checks, 164 tests
+.venv\Scripts\python.exe -m pytest -m "not network"   # offline suite, 151 tests
+.venv\Scripts\python.exe -m pytest                    # full suite including live data checks, 164 tests
 ```
 
 ## Layout
