@@ -1,0 +1,578 @@
+# Factor library (Build_Plan Section 5, with amendments made during the build).
+#
+# source.primary / source.fallback: a single input {provider, series, ...} or a multi-input
+#   {combine: diff|ratio, inputs: [...]}. Each input may carry its own `transform`; otherwise
+#   the factor-level `transform` applies.
+# Input options: release_lag_days (shift release date for weekly-published daily data),
+#   approx_lag_days (override the pre-vintage pseudo release lag).
+# Source option: max_age_days overrides the factor's freshness limit when that source is used.
+# sign: +1 = higher value pushes yields HIGHER. Transform periods count native observations.
+
+# ---------------- Theme A: Growth and activity ----------------
+- id: A1
+  name: GDPNow nowcast
+  definition: "Atlanta Fed GDPNow: a model-based nowcast of real GDP growth for the current quarter (annualized %), updated several times a month as new data are released. Used as the latest estimate available on each date. Sign +: faster growth pushes yields higher. Point-in-time from 2016; earlier history uses each quarter's final nowcast, dated 120 days after quarter start."
+  theme: growth
+  source:
+    # first vintage holds only final nowcasts, published ~120d after quarter start
+    primary: {provider: alfred, series: GDPNOW, approx_lag_days: 120}
+    fallback: null
+  transform: {type: level}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 21
+  notes: "Atlanta Fed GDPNow, latest estimate for the current quarter"
+
+- id: A2
+  name: CFNAI 3-month MA
+  definition: "Chicago Fed National Activity Index, 3-month average: a weighted average of 85 monthly indicators of production, employment, consumption and housing. 0 = the economy growing at trend; positive = above trend. Sign +: above-trend activity pushes yields higher."
+  theme: growth
+  source: {primary: {provider: alfred, series: CFNAIMA3}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 45
+
+- id: A3
+  name: Industrial production 6m ann.
+  definition: "Federal Reserve industrial production index (manufacturing, mining, utilities output). Transform: 6-month % change, annualized. Sign +: rising output pushes yields higher."
+  theme: growth
+  source: {primary: {provider: alfred, series: INDPRO}, fallback: null}
+  transform: {type: pct_change_annualized, periods: 6, ppy: 12}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 45
+
+- id: A4
+  name: Retail sales 3m/3m ann.
+  definition: "Census advance retail and food services sales (nominal, seasonally adjusted). Transform: average of the last 3 months versus the prior 3 months, annualized %. Smooths the noisy monthly print. Sign +: stronger consumer spending pushes yields higher."
+  theme: growth
+  source: {primary: {provider: alfred, series: RSAFS}, fallback: null}
+  transform: {type: pct_change_annualized, periods: 3, ppy: 12, roll: 3}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 0.5
+  max_age_days: 45
+
+- id: A5
+  name: Building permits 12m %
+  definition: "New private housing units authorized by building permits (Census, annual rate). Transform: % change versus 12 months earlier. A leading indicator of construction and rate-sensitive activity. Sign +: rising permits push yields higher."
+  theme: growth
+  source: {primary: {provider: alfred, series: PERMIT}, fallback: null}
+  transform: {type: pct_change, periods: 12}
+  sign: 1
+  weight_2y: 0.5
+  weight_10y: 1.0
+  max_age_days: 45
+
+- id: A6
+  name: Economic surprise index
+  definition: "Citi Economic Surprise Index, US: a rolling measure of how far data releases have come in above (positive) or below (negative) economist consensus. Bloomberg only; unavailable without a terminal. Sign +: upside surprises push yields higher."
+  theme: growth
+  source: {primary: {provider: bloomberg, series: CESIUSD Index}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 5
+
+# ---------------- Theme B: Labor ----------------
+- id: B1
+  name: Payrolls 3m avg change (k)
+  definition: "BLS nonfarm payrolls from the establishment survey (thousands of jobs). Transform: average monthly change over the last 3 months, using the revised figures available on each date. Sign +: stronger hiring pushes yields higher."
+  theme: labor
+  source: {primary: {provider: alfred, series: PAYEMS}, fallback: null}
+  transform: {type: mean_change, periods: 3}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 45
+
+- id: B2
+  name: Sahm rule gap
+  definition: "Sahm rule recession indicator, real-time version: the 3-month average unemployment rate minus its lowest 3-month average over the prior 12 months, in percentage points. A reading of 0.5 or more has historically marked the start of recessions. Sign -: rising labor-market slack pushes yields lower."
+  theme: labor
+  source: {primary: {provider: alfred, series: SAHMREALTIME}, fallback: null}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 45
+
+- id: B3
+  name: Initial claims 4wk avg 12m %
+  definition: "Initial jobless claims (weekly, seasonally adjusted). Transform: 4-week average, % change versus 52 weeks earlier. Rising claims are an early sign of layoffs. Sign -: rising claims push yields lower."
+  theme: labor
+  source: {primary: {provider: alfred, series: ICSA}, fallback: null}
+  transform: {type: pct_change, periods: 52, roll: 4}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 10
+
+- id: B4
+  name: Openings per unemployed
+  definition: "Job openings per unemployed person: JOLTS job openings divided by the number of unemployed (household survey). Above 1 = more openings than job seekers, a tight labor market. Sign +: tighter labor market pushes yields higher."
+  theme: labor
+  source:
+    primary:
+      combine: ratio
+      inputs:
+        - {provider: alfred, series: JTSJOL}
+        - {provider: alfred, series: UNEMPLOY}
+    fallback: null
+  transform: {type: level}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 0.5
+  max_age_days: 45
+
+- id: B5
+  name: Avg hourly earnings 3m ann.
+  definition: "Average hourly earnings of all private-sector employees (BLS). Transform: 3-month % change, annualized. Wage growth feeds services inflation. Sign +: faster wage growth pushes yields higher."
+  theme: labor
+  source: {primary: {provider: alfred, series: CES0500000003}, fallback: null}
+  transform: {type: pct_change_annualized, periods: 3, ppy: 12}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 45
+
+# ---------------- Theme C: Inflation ----------------
+- id: C1
+  name: Core PCE 3m ann.
+  definition: "Core PCE price index (excluding food and energy), the Fed's preferred inflation gauge. Transform: 3-month % change, annualized, to capture current momentum rather than the 12-month rate. Sign +: faster core inflation pushes yields higher."
+  theme: inflation
+  source: {primary: {provider: alfred, series: PCEPILFE}, fallback: null}
+  transform: {type: pct_change_annualized, periods: 3, ppy: 12}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 45
+
+- id: C2
+  name: Core CPI acceleration
+  definition: "Core CPI acceleration: core CPI's 3-month annualized % change minus its 12-month % change. Positive = inflation running hotter recently than over the past year (accelerating). Sign +: accelerating inflation pushes yields higher."
+  theme: inflation
+  source: {primary: {provider: alfred, series: CPILFESL}, fallback: null}
+  transform: {type: accel, periods: 3, ppy: 12}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 0.5
+  max_age_days: 45
+  notes: "3m annualized minus 12m change"
+
+- id: C3
+  name: Trimmed-mean PCE 12m
+  definition: "Dallas Fed trimmed-mean PCE inflation, 12-month %: drops the most extreme price changes each month to show underlying inflation. Sign +: higher underlying inflation pushes yields higher."
+  theme: inflation
+  source: {primary: {provider: alfred, series: PCETRIM12M159SFRBDAL}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 45
+
+- id: C4
+  name: 5y5y forward breakeven
+  definition: "5-year, 5-year forward breakeven inflation (FRED T5YIFR): the inflation rate the TIPS and nominal Treasury markets imply for the 5 years starting 5 years from now. A gauge of long-run inflation expectations. Sign +: higher expectations push yields higher."
+  theme: inflation
+  source: {primary: {provider: fred, series: T5YIFR}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 0.5
+  weight_10y: 1.0
+  max_age_days: 5
+
+- id: C5
+  name: UMich 1y inflation expectations
+  definition: "University of Michigan survey: households' median expected inflation over the next 12 months. FRED posts it with a one-month licensing delay. Sign +: higher expected inflation pushes yields higher."
+  theme: inflation
+  source: {primary: {provider: alfred, series: MICH}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 0.5
+  max_age_days: 65
+  notes: "FRED posts UMich with a one-month licensing delay"
+
+- id: C6
+  name: WTI oil 3m %
+  definition: "WTI crude oil spot price. Transform: % change over the last 3 months (63 trading days). A 7-day publication lag is applied because FRED receives it weekly. Sign +: rising oil pushes inflation and yields higher."
+  theme: inflation
+  source: {primary: {provider: fred, series: DCOILWTICO, release_lag_days: 7}, fallback: null}
+  transform: {type: pct_change, periods: 63}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 0.5
+  max_age_days: 12
+
+# ---------------- Theme D: Fed policy and liquidity ----------------
+- id: D1
+  name: Real policy rate
+  definition: "Real policy rate: the effective fed funds rate minus 12-month core PCE inflation. Measures how restrictive policy is after inflation. Sign -: a high real policy rate slows the economy, pushing yields lower over the following months."
+  theme: fed
+  source:
+    primary:
+      combine: diff
+      inputs:
+        - {provider: fred, series: DFF, transform: {type: level}}
+        - {provider: alfred, series: PCEPILFE, transform: {type: pct_change, periods: 12}}
+    fallback: null
+  transform: {type: level}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 0.5
+  max_age_days: 45
+  notes: "Fed funds minus core PCE 12m"
+
+- id: D2
+  name: Priced policy path (1y)
+  definition: "Priced policy path over the next year: the 1-year OIS rate minus the effective fed funds rate (Bloomberg only; unavailable without a terminal). The former FRED fallback, the 1-year bill minus fed funds, was removed because it duplicated F5. Negative = the market prices rate cuts. Sign - (contrarian): when the market already prices deep cuts, the risk skews toward 2y yields rising. Fails in genuine easing cycles."
+  theme: fed
+  source:
+    primary:
+      combine: diff
+      inputs:
+        - {provider: bloomberg, series: USOSFR1 Curncy}
+        - {provider: bloomberg, series: FEDL01 Index}
+    # No FRED fallback: 1y bill minus fed funds duplicates F5 (2y minus fed funds), pressure correlation 0.91.
+    fallback: null
+  transform: {type: level}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 0.5
+  max_age_days: 5
+  notes: "Contrarian: deep cuts priced -> positive pressure. Bloomberg only since the 2026-10-18 review."
+
+- id: D3
+  name: Fed balance sheet 6m %
+  definition: "Federal Reserve total assets (balance sheet size). Transform: % change over 26 weeks. Expansion (QE) adds demand for duration; shrinkage (QT) removes it. Sign -: a growing balance sheet pushes yields lower."
+  theme: fed
+  source: {primary: {provider: alfred, series: WALCL}, fallback: null}
+  transform: {type: pct_change, periods: 26}
+  sign: -1
+  weight_2y: 0.5
+  weight_10y: 1.0
+  max_age_days: 10
+
+- id: D4
+  name: Bank reserves 3m %
+  definition: "Reserve balances banks hold at the Fed. Transform: % change over 13 weeks. A measure of system liquidity. Sign -: rising reserves (more liquidity) push yields lower."
+  theme: fed
+  source: {primary: {provider: alfred, series: WRESBAL}, fallback: null}
+  transform: {type: pct_change, periods: 13}
+  sign: -1
+  weight_2y: 0.5
+  weight_10y: 1.0
+  max_age_days: 10
+
+- id: D5
+  name: Chicago Fed NFCI
+  definition: "Chicago Fed National Financial Conditions Index: a weekly composite of 105 measures of risk, credit and leverage. 0 = average conditions; positive = tighter than average. Sign -: tighter conditions slow the economy, pushing yields lower. The whole history is re-estimated weekly; the value used is as published each week."
+  theme: fed
+  source: {primary: {provider: alfred, series: NFCI}, fallback: null}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 10
+
+# ---------------- Theme E: Supply and fiscal ----------------
+- id: E1
+  name: Federal deficit % GDP (12m)
+  definition: "Federal deficit as % of GDP: the trailing 12-month budget deficit from the Monthly Treasury Statement divided by nominal GDP. Larger deficits mean more Treasury supply. Sign +: wider deficits push yields higher. Used for 10y only."
+  theme: supply
+  source:
+    primary:
+      combine: ratio
+      inputs:
+        # surplus(-)/deficit in $mn, 12m sum, sign-flipped and scaled so the ratio to GDP ($bn SAAR) is in %
+        - {provider: alfred, series: MTSDS133FMS, transform: {type: level, roll: 12, roll_how: sum, scale: -0.1}}
+        - {provider: alfred, series: GDP, transform: {type: level}}
+    fallback: null
+  transform: {type: level}
+  sign: 1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 60
+
+- id: E2
+  name: 10y auction bid-to-cover (3 auct.)
+  definition: "10-year note auction bid-to-cover ratio (total bids divided by the amount sold), averaged over the last 3 ten-year auctions including reopenings. Higher = stronger demand. Sign -: strong auction demand pushes yields lower. Used for 10y only."
+  theme: supply
+  source: {primary: {provider: public, series: "TD:BTC_10Y"}, fallback: null}
+  transform: {type: level, roll: 3}
+  sign: -1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 40
+
+- id: E3
+  name: 10y auction indirect % (3 auct.)
+  definition: "Indirect bidders' share of the 10-year auction: the share of competitive awards going to indirect bidders (bids placed through dealers, largely foreign official and institutional investors), averaged over the last 3 auctions. Sign -: strong end-investor demand pushes yields lower. History from 2008."
+  theme: supply
+  source: {primary: {provider: public, series: "TD:INDIRECT_10Y"}, fallback: null}
+  transform: {type: level, roll: 3}
+  sign: -1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 40
+
+- id: E4
+  name: 2y auction bid-to-cover (3 auct.)
+  definition: "2-year note auction bid-to-cover ratio, averaged over the last 3 two-year auctions. Sign -: strong demand pushes yields lower. Used for 2y only."
+  theme: supply
+  source: {primary: {provider: public, series: "TD:BTC_2Y"}, fallback: null}
+  transform: {type: level, roll: 3}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 0.0
+  max_age_days: 40
+
+- id: E5
+  name: Coupon issuance 3m, 12m %
+  definition: "Gross nominal coupon issuance: the total size of note and bond auctions (excluding TIPS and floating-rate notes) over the last 3 months, % change versus a year earlier. Rising issuance means more duration for the market to absorb. Sign +: rising supply pushes yields higher. Reads 0 when auction sizes are unchanged from a year ago."
+  theme: supply
+  source: {primary: {provider: public, series: "TD:COUPON_ISSUANCE"}, fallback: null}
+  transform: {type: pct_change, periods: 12, roll: 3, roll_how: sum}
+  sign: 1
+  weight_2y: 0.5
+  weight_10y: 1.0
+  max_age_days: 35
+
+- id: E6
+  name: Dealer coupon inventory 7-11y
+  definition: "NY Fed primary dealer net positions in Treasury coupons maturing in 7 to 11 years ($ millions, long minus short). Large dealer inventory means supply not yet placed with end investors. Weekly, published about 8 days after the as-of date. Sign +: heavy dealer inventory pushes yields higher."
+  theme: supply
+  source: {primary: {provider: public, series: "NYFED:PDPOSGSC-G7L11"}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 14
+
+# ---------------- Theme F: Valuation and term premium ----------------
+- id: F1
+  name: 10y term premium (KW)
+  definition: "10-year term premium from the Kim-Wright model (Federal Reserve Board): the extra yield investors demand for holding a 10y bond instead of rolling short-term bills. Sign - (contrarian valuation): a high term premium means bonds are cheap, which tends to precede lower yields."
+  theme: valuation
+  source:
+    primary: {provider: alfred, series: THREEFYTP10}
+    fallback: {provider: bloomberg, series: ACMTP10 Index}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 14
+
+- id: F2
+  name: 2y term premium (KW)
+  definition: "2-year term premium from the Kim-Wright model. Sign - (contrarian valuation): a high term premium means the 2y is cheap, which tends to precede lower yields. Used for 2y only."
+  theme: valuation
+  source: {primary: {provider: alfred, series: THREEFYTP2}, fallback: null}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 0.0
+  max_age_days: 14
+
+- id: F3
+  name: 10y fair value residual
+  definition: "10y fair value residual: the actual 10y yield minus the yield predicted by a rolling regression on fed funds, core PCE inflation, real GDP growth and the Fed balance sheet (see the fair value model above). Negative = the 10y is rich versus fundamentals. Sign -: a rich 10y (negative residual) gets positive pressure toward higher yields."
+  theme: valuation
+  source: {primary: {provider: model, series: fair_value}, fallback: null}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 45
+
+- id: F4
+  name: 10y real yield
+  definition: "10-year TIPS real yield. A high real yield means policy and valuations are restrictive and bonds are cheap in real terms. Sign - (contrarian valuation): a high real yield tends to precede lower yields. Used for 10y only."
+  theme: valuation
+  source:
+    primary: {provider: fred, series: DFII10}
+    fallback: {provider: bloomberg, series: USGGT10Y Index}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 5
+
+- id: F5
+  name: 2y vs fed funds
+  definition: "2-year Treasury yield minus the effective fed funds rate. Positive = the 2y yields more than overnight money, either because hikes are priced or the 2y is cheap. Sign - (contrarian valuation): a wide spread tends to precede lower 2y yields. Used for 2y only."
+  theme: valuation
+  source:
+    primary:
+      combine: diff
+      inputs:
+        - {provider: fred, series: DGS2}
+        - {provider: fred, series: DFF}
+    fallback: null
+  transform: {type: level}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 0.0
+  max_age_days: 5
+
+- id: F6
+  name: 10y swap spread
+  definition: "10-year swap spread: the 10y swap rate minus the 10y Treasury yield (Bloomberg only; unavailable without a terminal). Reflects Treasury supply and dealer balance sheet pressure. Sign + as set in Build_Plan. Used for 10y only, at half weight."
+  theme: valuation
+  source: {primary: {provider: bloomberg, series: USSP10 Curncy}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 0.0
+  weight_10y: 0.5
+  max_age_days: 5
+
+# ---------------- Theme G: Momentum and positioning ----------------
+- id: G1
+  name: 10y momentum 12m-1m (bp)
+  definition: "10y yield momentum: the change in the 10y yield from 12 months ago to 1 month ago, in bp. Skipping the most recent month avoids short-term reversals. Sign +: yields that have been trending up tend to keep rising."
+  theme: momentum
+  source: {primary: {provider: fred, series: DGS10}, fallback: null}
+  transform: {type: momentum_12m_1m, long: 252, short: 21, scale: 100}
+  sign: 1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 5
+
+- id: G2
+  name: 2y momentum 12m-1m (bp)
+  definition: "2y yield momentum: the change in the 2y yield from 12 months ago to 1 month ago, in bp. Sign +: an upward trend tends to persist."
+  theme: momentum
+  source: {primary: {provider: fred, series: DGS2}, fallback: null}
+  transform: {type: momentum_12m_1m, long: 252, short: 21, scale: 100}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 0.0
+  max_age_days: 5
+
+- id: G3
+  name: 10y vs 200d MA (bp)
+  definition: "10y trend: the 10y yield minus its 200-day moving average, in bp. Positive = yields above their longer-run trend. Sign +: yields above trend tend to keep rising."
+  theme: momentum
+  source: {primary: {provider: fred, series: DGS10}, fallback: null}
+  transform: {type: diff_vs_ma, window: 200, scale: 100}
+  sign: 1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 5
+
+- id: G4
+  name: TY+TN lev. fund net % OI
+  definition: "CFTC Traders in Financial Futures: leveraged funds' (hedge funds and CTAs) net position in 10-year (TY) plus Ultra 10-year (TN) Treasury futures, as % of open interest. Positions as of Tuesday, published Friday. Sign +: a crowded short (very negative) gets negative pressure, because short covering pushes yields lower. Used for 10y only."
+  theme: momentum
+  # TFF report launched Sept 2010 with history backfilled to 2006: earlier values are not point-in-time
+  source: {primary: {provider: public, series: "CFTC:LEVNET_TY_TN", pit_from: "2010-09-07"}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 10
+  notes: "Contrarian: crowded short -> negative pressure"
+
+- id: G5
+  name: TU lev. fund net % OI
+  definition: "CFTC leveraged funds' net position in 2-year (TU) Treasury futures, as % of open interest. Sign +: a crowded short gets negative pressure (short-covering risk). Used for 2y only."
+  theme: momentum
+  # TFF report launched Sept 2010 with history backfilled to 2006: earlier values are not point-in-time
+  source: {primary: {provider: public, series: "CFTC:LEVNET_TU", pit_from: "2010-09-07"}, fallback: null}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 1.0
+  weight_10y: 0.0
+  max_age_days: 10
+
+- id: G6
+  name: MOVE rate vol
+  definition: "MOVE index: implied volatility of Treasury options (the bond market's VIX). Bloomberg only; unavailable without a terminal. Sign -: high rate volatility goes with risk-off flows into Treasuries, pushing yields lower."
+  theme: momentum
+  source: {primary: {provider: bloomberg, series: MOVE Index}, fallback: null}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 0.5
+  weight_10y: 0.5
+  max_age_days: 5
+
+# ---------------- Theme H: Global and risk sentiment ----------------
+- id: H1
+  name: Bund 10y 3m change (bp)
+  definition: "German 10-year Bund yield, change over the last 3 months in bp. Bloomberg daily data when available; otherwise the OECD monthly series on FRED (change over 3 monthly observations). Global yields move together. Sign +: rising Bund yields push US yields higher."
+  theme: global
+  source:
+    primary: {provider: bloomberg, series: GDBR10 Index, transform: {type: diff, periods: 63, scale: 100}}
+    fallback: {provider: alfred, series: IRLTLT01DEM156N, transform: {type: diff, periods: 3, scale: 100}, max_age_days: 45}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 0.5
+  weight_10y: 1.0
+  max_age_days: 5
+
+- id: H2
+  name: JGB 10y 3m change (bp)
+  definition: "Japanese 10-year government bond yield, change over the last 3 months in bp (Bloomberg daily or OECD monthly fallback). Rising JGB yields can pull Japanese money home from Treasuries. Sign +: rising JGB yields push US yields higher. Used for 10y only."
+  theme: global
+  source:
+    primary: {provider: bloomberg, series: GJGB10 Index, transform: {type: diff, periods: 63, scale: 100}}
+    fallback: {provider: alfred, series: IRLTLT01JPM156N, transform: {type: diff, periods: 3, scale: 100}, max_age_days: 45}
+  transform: {type: level}
+  sign: 1
+  weight_2y: 0.0
+  weight_10y: 1.0
+  max_age_days: 5
+
+- id: H3
+  name: Broad dollar 3m %
+  definition: "Federal Reserve nominal broad trade-weighted dollar index, % change over the last 3 months. A 7-day publication lag is applied because FRED receives it weekly. Sign -: a stronger dollar tightens financial conditions, pushing yields lower."
+  theme: global
+  source: {primary: {provider: fred, series: DTWEXBGS, release_lag_days: 7}, fallback: null}
+  transform: {type: pct_change, periods: 63}
+  sign: -1
+  weight_2y: 0.5
+  weight_10y: 1.0
+  max_age_days: 12
+
+- id: H4
+  name: Credit spread 3m change (bp)
+  definition: "Credit spread, change over the last 3 months in bp: high-yield corporate OAS on Bloomberg (LF98OAS); without Bloomberg, Moody's Baa corporate yield minus the 10y Treasury yield (FRED keeps only 3 years of ICE high-yield history). Sign -: widening spreads signal risk-off, pushing yields lower."
+  theme: global
+  source:
+    primary: {provider: bloomberg, series: LF98OAS Index, transform: {type: diff, periods: 63}}
+    fallback: {provider: fred, series: BAA10Y, transform: {type: diff, periods: 63, scale: 100}}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 5
+  notes: "HY OAS on Bloomberg; Moody's Baa-10y fallback (FRED keeps only 3y of ICE BofA)"
+
+- id: H5
+  name: VIX
+  definition: "VIX: implied volatility of S&P 500 options. Sign -: high equity volatility goes with flight-to-quality buying of Treasuries, pushing yields lower."
+  theme: global
+  source: {primary: {provider: fred, series: VIXCLS}, fallback: null}
+  transform: {type: level}
+  sign: -1
+  weight_2y: 1.0
+  weight_10y: 1.0
+  max_age_days: 5
+
+- id: H6
+  name: Copper 6m %
+  definition: "IMF global copper price (monthly, $ per tonne), % change over 6 months. Copper is a proxy for global industrial demand. Published with about a 2-month lag. Sign +: rising copper signals stronger growth, pushing yields higher."
+  theme: global
+  source: {primary: {provider: alfred, series: PCOPPUSDM}, fallback: null}
+  transform: {type: pct_change, periods: 6}
+  sign: 1
+  weight_2y: 0.5
+  weight_10y: 1.0
+  max_age_days: 75
+  notes: "IMF monthly, ~2 month publication lag"

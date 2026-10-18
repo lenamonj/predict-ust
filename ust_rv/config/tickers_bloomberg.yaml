@@ -1,0 +1,11 @@
+# Every ticker is unverified until confirmed on a live terminal (Phase 4).
+CESIUSD Index:   {verified: false, used_by: [A6]}
+USOSFR1 Curncy:  {verified: false, used_by: [D2]}
+FEDL01 Index:    {verified: false, used_by: [D2]}
+ACMTP10 Index:   {verified: false, used_by: [F1]}
+USGGT10Y Index:  {verified: false, used_by: [F4]}
+USSP10 Curncy:   {verified: false, used_by: [F6]}
+MOVE Index:      {verified: false, used_by: [G6]}
+GDBR10 Index:    {verified: false, used_by: [H1]}
+GJGB10 Index:    {verified: false, used_by: [H2]}
+LF98OAS Index:   {verified: false, used_by: [H4]}

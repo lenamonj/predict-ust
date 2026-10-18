@@ -1,0 +1,20 @@
+PyYAML==6.0.3
+fredapi==0.5.2
+hmmlearn==0.3.3
+ipykernel==7.4.0
+lightgbm==4.7.0
+nbconvert==7.17.2
+nbformat==5.11.1
+numpy==2.5.4
+pandas==3.0.6
+plotly==7.1.0
+pyarrow==26.0.0
+pytest==9.1.1
+python-dotenv==1.2.4
+requests==2.34.2
+scikit-learn==1.9.1
+scipy==1.18.1
+statsmodels==0.15.0
+# Bloomberg (Phase 4, terminal machine only):
+# blpapi via: pip install --index-url=https://blpapi.bloomberg.com/repository/releases/python/simple/ blpapi
+# xbbg

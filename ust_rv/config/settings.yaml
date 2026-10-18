@@ -1,0 +1,42 @@
+# Paths are relative to the repo root.
+paths:
+  cache: cache
+  runs: runs
+  env_file: .env
+
+calendar:
+  start: "1990-01-01"
+
+horizon_days: 126
+
+zscore:
+  window: 2520
+  min_periods: 1260
+  clip: 3.0
+
+# Written by `python -m ust_rv.backtest.calibrate`. Thresholds are in sd units of the composite.
+# Spec defaults: 0.50 / 0.25, phase1.
+decision:
+  2y: {enter: 0.50, exit: 0.25}
+  10y: {enter: 0.50, exit: 0.25}
+
+composite_model:  # phase1 | ridge | regime
+  2y: phase1
+  10y: phase1
+
+sign_check:
+  window_days: 1260
+  warn_rho: -0.10
+
+backtest_start: "2005-01-01"
+
+# Phase 1 theme weights (Build_Plan 6.3)
+theme_weights:
+  growth:    {w2y: 1.0,  w10y: 1.0}
+  labor:     {w2y: 1.25, w10y: 1.0}
+  inflation: {w2y: 1.5,  w10y: 1.25}
+  fed:       {w2y: 1.5,  w10y: 1.0}
+  supply:    {w2y: 0.25, w10y: 1.0}
+  valuation: {w2y: 1.0,  w10y: 1.25}
+  momentum:  {w2y: 0.75, w10y: 0.75}
+  global:    {w2y: 0.75, w10y: 1.0}
